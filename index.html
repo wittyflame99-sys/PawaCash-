@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PawaCash - Save, Borrow, Grow</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}
+body{margin:0;background:#0f172a;color:#fff;padding:16px}
+.logo{text-align:center;font-size:28px;font-weight:900;color:#facc15}
+.logo span{color:#fff}
+.sub{text-align:center;color:#cbd5e1;font-size:13px;margin-bottom:16px}
+.card{background:#1e293b;border-radius:16px;padding:16px;margin-bottom:14px}
+input,select{width:100%;padding:12px;border-radius:10px;border:none;margin:8px 0;background:#0f172a;color:#fff;outline:none}
+button{width:100%;padding:13px;border:none;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;margin-top:6px}
+.btn-yellow{background:#facc15;color:#000}
+.btn-green{background:#22c55e;color:#fff}
+.btn-blue{background:#3b82f6;color:#fff}
+.btn-red{background:#ef4444;color:#fff}
+.balance{font-size:36px;font-weight:900;text-align:center}
+.small{text-align:center;color:#94a3b8;font-size:12px}
+.tx{background:#0f172a;padding:10px;border-radius:10px;margin-top:8px;font-size:13px;display:flex;justify-content:space-between}
+.badge{padding:3px 8px;border-radius:20px;font-size:11px}
+.pending{background:#facc15;color:#000}
+.approved{background:#22c55e}
+.rejected{background:#ef4444}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tabs button{flex:1;background:#334155;color:#fff}
+.tabs button.active{background:#facc15;color:#000}
+.hidden{display:none}
+</style>
+</head>
+<body>
+
+<div class="logo">PAWA<span>CASH</span> 💎</div>
+<div class="sub">Save • Borrow • Withdraw — Kampala, Uganda</div>
+
+<!-- LOGIN -->
+<div class="card" id="loginCard">
+  <h3 style="margin:0">Welcome Boss 👋</h3>
+  <p class="small" style="text-align:left">Enter your phone to start. Example: 0771234567</p>
+  <input id="phoneInput" placeholder="Phone number e.g 0771234567">
+  <input id="nameInput" placeholder="Your full name">
+  <button class="btn-yellow" onclick="login()">Enter PawaCash →</button>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" class="hidden">
+  <div class="card">
+    <div class="small">Hello, <b id="userName"></b> • <span id="userPhone"></span></div>
+    <div class="small">TOTAL BALANCE</div>
+    <div class="balance">UGX <span id="balance">0</span></div>
+    <div class="small">Deposits - Withdrawals - Loans Due</div>
+    <button class="btn-red" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="tabs">
+    <button id="tabDeposit" class="active" onclick="showTab('deposit')">Deposit</button>
+    <button id="tabLoan" onclick="showTab('loan')">Loan</button>
+    <button id="tabWithdraw" onclick="showTab('withdraw')">Withdraw</button>
+  </div>
+
+  <!-- DEPOSIT -->
+  <div class="card" id="boxDeposit">
+    <h3 style="margin:0">💰 Deposit Money</h3>
+    <p class="small" style="text-align:left">Send to MTN/Airtel: <b>077XXXXXXX - PawaCash</b> then enter amount below.</p>
+    <input id="depAmount" type="number" placeholder="Amount e.g 50000">
+    <select id="depMethod"><option>MTN MoMo</option><option>Airtel Money</option><option>Cash to Agent</option></select>
+    <button class="btn-green" onclick="makeDeposit()">Request Deposit</button>
+  </div>
+
+  <!-- LOAN -->
+  <div class="card hidden" id="boxLoan">
+    <h3 style="margin:0">💳 Request Loan</h3>
+    <p class="small" style="text-align:left">Interest: 10% per month. Pay in 30 days.</p>
+    <input id="loanAmount" type="number" placeholder="Loan amount e.g 100000">
+    <select id="loanReason"><option>Business</option><option>School Fees</option><option>Emergency</option><option>Rent</option></select>
+    <button class="btn-blue" onclick="makeLoan()">Request Loan</button>
+  </div>
+
+  <!-- WITHDRAW -->
+  <div class="card hidden" id="boxWithdraw">
+    <h3 style="margin:0">🏧 Withdraw</h3>
+    <input id="withAmount" type="number" placeholder="Amount to withdraw">
+    <button class="btn-yellow" onclick="makeWithdraw()">Request Withdrawal</button>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0">📜 My Transactions</h3>
+    <div id="txList"><p class="small">No transactions yet.</p></div>
+  </div>
+</div>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// YOUR FIREBASE CONFIG - PawaCash
+const firebaseConfig = {
+  apiKey: "AIzaSyCYw7WnToAYJybUshIZXpdfvrw83cAGnhU",
+  authDomain: "pawacash-6e28c.firebaseapp.com",
+  databaseURL: "https://pawacash-6e28c-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pawacash-6e28c",
+  storageBucket: "pawacash-6e28c.firebasestorage.app",
+  messagingSenderId: "520934041930",
+  appId: "1:520934041930:web:ecc0ba9160ba1ad30e79b3",
+  measurementId: "G-Y366JJ5WXB"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let currentPhone = localStorage.getItem('pawacash_phone');
+let currentName = localStorage.getItem('pawacash_name');
+
+if(currentPhone){ showApp(); }
+
+function login(){
+  let phone = document.getElementById('phoneInput').value.trim();
+  let name = document.getElementById('nameInput').value.trim();
+  if(!phone || !name){ alert('Enter phone and name boss'); return; }
+  currentPhone = phone; currentName = name;
+  localStorage.setItem('pawacash_phone', phone);
+  localStorage.setItem('pawacash_name', name);
+  // save user
+  db.ref('users/' + phone.replace(/[^0-9]/g,'')).set({name:name, phone:phone, createdAt: Date.now()});
+  showApp();
+}
+function showApp(){
+  document.getElementById('loginCard').classList.add('hidden');
+  document.getElementById('mainApp').classList.remove('hidden');
+  document.getElementById('userName').innerText = currentName;
+  document.getElementById('userPhone').innerText = currentPhone;
+  loadTransactions();
+}
+function logout(){ localStorage.clear(); location.reload(); }
+
+function showTab(t){
+  ['deposit','loan','withdraw'].forEach(x=>{
+    document.getElementById('box'+x.charAt(0).toUpperCase()+x.slice(1)).classList.add('hidden');
+    document.getElementById('tab'+x.charAt(0).toUpperCase()+x.slice(1)).classList.remove('active');
+  });
+  document.getElementById('box'+t.charAt(0).toUpperCase()+t.slice(1)).classList.remove('hidden');
+  document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.add('active');
+}
+
+function makeDeposit(){
+  let amt = Number(document.getElementById('depAmount').value);
+  let method = document.getElementById('depMethod').value;
+  if(!amt || amt < 1000){ alert('Minimum deposit 1000'); return; }
+  pushTx('Deposit', amt, method);
+}
+function makeLoan(){
+  let amt = Number(document.getElementById('loanAmount').value);
+  let reason = document.getElementById('loanReason').value;
+  if(!amt || amt < 5000){ alert('Minimum loan 5000'); return; }
+  pushTx('Loan', amt, reason + ' - Pay back: ' + Math.round(amt*1.1));
+}
+function makeWithdraw(){
+  let amt = Number(document.getElementById('withAmount').value);
+  if(!amt || amt < 1000){ alert('Minimum withdraw 1000'); return; }
+  pushTx('Withdraw', amt, 'To Mobile Money');
+}
+
+function pushTx(type, amount, note){
+  let key = db.ref('transactions').push().key;
+  db.ref('transactions/' + key).set({
+    phone: currentPhone,
+    name: currentName,
+    type: type,
+    amount: amount,
+    note: note,
+    status: 'Pending',
+    time: Date.now()
+  }).then(()=>{ alert(type + ' request sent! Wait for admin approval.'); });
+}
+
+function loadTransactions(){
+  db.ref('transactions').orderByChild('phone').equalTo(currentPhone).on('value', (snap)=>{
+    let list = document.getElementById('txList');
+    let data = snap.val();
+    if(!data){ list.innerHTML = '<p class="small">No transactions yet.</p>'; document.getElementById('balance').innerText = '0'; return; }
+    let html = ''; let bal = 0;
+    let arr = Object.values(data).sort((a,b)=>b.time-a.time);
+    arr.forEach(tx=>{
+      if(tx.status === 'Approved'){
+        if(tx.type==='Deposit') bal += tx.amount;
+        if(tx.type==='Withdraw') bal -= tx.amount;
+        if(tx.type==='Loan') bal += tx.amount;
+      }
+      let color = tx.status==='Approved' ? 'approved' : tx.status==='Rejected' ? 'rejected' : 'pending';
+      html += `<div class="tx"><div><b>${tx.type}</b> - UGX ${tx.amount.toLocaleString()}<br><span style="color:#94a3b8">${tx.note} • ${new Date(tx.time).toLocaleDateString()}</span></div><span class="badge ${color}">${tx.status}</span></div>`;
+    });
+    list.innerHTML = html;
+    document.getElementById('balance').innerText = bal.toLocaleString();
+  });
+}
+</script>
+</body>
+    </html>
