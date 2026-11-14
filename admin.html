@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PawaCash Admin - Boss Dashboard</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}
+body{margin:0;background:#0f172a;color:#fff;padding:16px}
+.logo{text-align:center;font-size:26px;font-weight:900;color:#facc15}
+.sub{text-align:center;color:#cbd5e1;font-size:12px;margin-bottom:14px}
+.card{background:#1e293b;border-radius:16px;padding:16px;margin-bottom:14px}
+.stats{display:flex;gap:10px}
+.stat{flex:1;background:#0f172a;border-radius:12px;padding:12px;text-align:center}
+.stat b{font-size:20px;display:block}
+input{width:100%;padding:12px;border-radius:10px;border:none;margin:8px 0;background:#0f172a;color:#fff}
+button{padding:10px 14px;border:none;border-radius:10px;font-weight:800;cursor:pointer}
+.btn-yellow{background:#facc15;color:#000;width:100%;padding:13px}
+.btn-green{background:#22c55e;color:#fff}
+.btn-red{background:#ef4444;color:#fff}
+.tx{background:#0f172a;padding:12px;border-radius:12px;margin-top:10px}
+.row{display:flex;gap:8px;margin-top:8px}
+.row button{flex:1}
+.badge{padding:3px 8px;border-radius:20px;font-size:11px}
+.pending{background:#facc15;color:#000}
+.approved{background:#22c55e}
+.rejected{background:#ef4444}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="logo">PAWACASH ADMIN 👑</div>
+<div class="sub">Boss Only - Approve Deposits / Loans / Withdrawals</div>
+<div class="card" id="lockCard">
+<h3 style="margin:0">Enter Admin Password</h3>
+<input id="passInput" type="password" placeholder="Password">
+<p style="font-size:12px;color:#94a3b8">Default password: <b style="color:#fff">pawa123</b></p>
+<button class="btn-yellow" onclick="unlock()">Unlock Dashboard →</button>
+</div>
+<div id="dash" class="hidden">
+<div class="card"><div class="stats">
+<div class="stat"><span style="font-size:12px;color:#94a3b8">Total Deposits</span><b id="totalDep" style="color:#22c55e">0</b></div>
+<div class="stat"><span style="font-size:12px;color:#94a3b8">Total Loans</span><b id="totalLoan" style="color:#3b82f6">0</b></div>
+<div class="stat"><span style="font-size:12px;color:#94a3b8">Pending</span><b id="totalPend" style="color:#facc15">0</b></div>
+</div></div>
+<div class="card"><h3 style="margin:0">📜 All Transactions</h3><div id="txList"><p style="color:#94a3b8;font-size:13px">No transactions yet.</p></div></div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCYw7WnToAYJybUshIZXpdfvrw83cAGnhU",
+  authDomain: "pawacash-6e28c.firebaseapp.com",
+  databaseURL: "https://pawacash-6e28c-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "pawacash-6e28c",
+  storageBucket: "pawacash-6e28c.firebasestorage.app",
+  messagingSenderId: "520934041930",
+  appId: "1:520934041930:web:ecc0ba9160ba1ad30e79b3",
+  measurementId: "G-Y366JJ5WXB"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+function unlock(){
+  let p = document.getElementById('passInput').value;
+  if(p !== 'pawa123'){ alert('Wrong password boss'); return; }
+  document.getElementById('lockCard').classList.add('hidden');
+  document.getElementById('dash').classList.remove('hidden');
+  loadAll();
+}
+function approve(id){ db.ref('transactions/'+id).update({status:'Approved'}); }
+function reject(id){ db.ref('transactions/'+id).update({status:'Rejected'}); }
+function loadAll(){
+  db.ref('transactions').on('value', (snap)=>{
+    let data = snap.val();
+    let list = document.getElementById('txList');
+    if(!data){ list.innerHTML = '<p>No transactions yet.</p>'; return; }
+    let entries = Object.entries(data).sort((a,b)=>b[1].time-a[1].time);
+    let dep=0, loan=0, pend=0, html='';
+    entries.forEach(([id, tx])=>{
+      if(tx.status==='Approved' && tx.type==='Deposit') dep+=tx.amount;
+      if(tx.status==='Approved' && tx.type==='Loan') loan+=tx.amount;
+      if(tx.status==='Pending') pend++;
+      let color = tx.status==='Approved' ? 'approved' : tx.status==='Rejected' ? 'rejected' : 'pending';
+      html += `<div class="tx"><b>${tx.type} - UGX ${tx.amount.toLocaleString()}</b> <span class="badge ${color}">${tx.status}</span><br><span style="color:#94a3b8;font-size:12px">${tx.name} • ${tx.phone}<br>${tx.note} • ${new Date(tx.time).toLocaleString()}</span><div class="row"><button class="btn-green" onclick="approve('${id}')">✅ Approve</button><button class="btn-red" onclick="reject('${id}')">❌ Reject</button></div></div>`;
+    });
+    list.innerHTML = html;
+    document.getElementById('totalDep').innerText = 'UGX ' + dep.toLocaleString();
+    document.getElementById('totalLoan').innerText = 'UGX ' + loan.toLocaleString();
+    document.getElementById('totalPend').innerText = pend;
+  });
+}
+</script>
+</body>
+</html>
